@@ -1,0 +1,104 @@
+# playbooks/install-asdf.yml
+---
+- name: Install asdf version manager
+  hosts: all
+  become: yes
+  become_user: "{{ username }}"
+  gather_facts: yes
+  
+  vars:
+    plugins:
+      - golang
+      - python
+      - nodejs
+
+    plugin_dependencies:
+      nodejs:
+        - dirmngr
+        - gpg
+        - curl
+        - gawk
+      python:
+        - make
+        - build-essential
+        - libssl-dev
+        - zlib1g-dev
+        - libbz2-dev
+        - libreadline-dev
+        - libsqlite3-dev
+        - wget
+        - curl
+        - llvm
+        - libncursesw5-dev
+        - xz-utils
+        - tk-dev
+        - libxml2-dev
+        - libxmlsec1-dev
+        - libffi-dev
+        - liblzma-dev
+      golang:
+        - coreutils
+        - curl
+  
+  tasks:
+    # ========================================
+    # INSTALL ASDF PREREQUISITES
+    # ========================================
+    
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+      become: yes
+      become_user: root
+      tags: ['asdf', 'prerequisites']
+    
+    - name: Install basic dependencies for asdf
+      apt:
+        name:
+          - git
+          - curl
+          - build-essential
+        state: present
+      become: yes
+      become_user: root
+      tags: ['asdf', 'prerequisites']
+    
+    - name: Install plugin-specific dependencies
+      apt:
+        name: "{{ item.value }}"
+        state: present
+      loop: "{{ plugin_dependencies | dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"
+      become: yes
+      become_user: root
+      tags: ['asdf', 'dependencies']
+    
+    # ========================================
+    # INSTALL ASDF
+    # ========================================
+
+    - name: Install ASDF
+      become: yes
+      become_user: root
+      block:
+        - name: Fetch ASDF install
+          get_url:
+            url: https://github.com/asdf-vm/asdf/releases/download/v0.18.0/asdf-v0.18.0-linux-amd64.tar.gz
+            dest: /tmp/asdf-v0.18.0-linux-amd64.tar.gz
+            checksum: sha256:4d3007070166cb0a652af26c3f0462b021e04cb26c4ab13894d13689da89f5b8
+        - name: Unpack ASDF install
+          ansible.builtin.unarchive:
+            src: /tmp/asdf-v0.18.0-linux-amd64.tar.gz
+            dest: /usr/local/bin
+          become: true
+        - name: Remove ASDF install
+          file:
+            path: /tmp/asdf-v0.18.0-linux-amd64.tar.gz
+            state: absent
+
+    - name: ASDF plugins
+      ansible.builtin.shell:
+        cmd: asdf plugin add {{ item }}
+      loop: "{{ plugins }}"

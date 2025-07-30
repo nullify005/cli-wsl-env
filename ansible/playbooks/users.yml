@@ -1,0 +1,91 @@
+# playbooks/manage-users.yml
+---
+- name: Install User(s)
+  hosts: all
+  become: yes
+  gather_facts: yes
+  
+  vars:
+    # Define users to create
+    users_to_create:
+      - name: "{{ username }}"
+        comment: "{{ username }}"
+        shell: /bin/zsh
+        groups: 
+          - sudo
+          - docker
+        create_home: yes
+        password: "{{ 'password' | password_hash('sha512') }}"
+        
+    # Common settings
+    default_shell: /bin/bash
+    password_expire_days: 0
+  
+  tasks:
+    - name: Create user groups if they don't exist
+      group:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - docker
+        - developers
+      tags: ['users', 'groups']
+    
+    - name: Create users
+      user:
+        name: "{{ item.name }}"
+        comment: "{{ item.comment | default('') }}"
+        shell: "{{ item.shell | default(default_shell) }}"
+        groups: "{{ item.groups | default([]) }}"
+        append: yes
+        create_home: "{{ item.create_home | default(true) }}"
+        home: "{{ item.home | default('/home/' + item.name) }}"
+        password: "{{ item.password | default('!') }}"  # '!' means no password login
+        state: present
+      loop: "{{ users_to_create }}"
+      tags: ['users', 'create']
+    
+    - name: Set password expiry for users
+      user:
+        name: "{{ item.name }}"
+        password_expire_max: "{{ password_expire_days }}"
+      loop: "{{ users_to_create }}"
+      when: item.password is defined and item.password != '!'
+      tags: ['users', 'password']
+    
+    - name: Add SSH keys for users
+      authorized_key:
+        user: "{{ item.name }}"
+        key: "{{ item.ssh_key }}"
+        state: present
+      loop: "{{ users_to_create }}"
+      when: item.ssh_key is defined and item.ssh_key != ''
+      tags: ['users', 'ssh']
+    
+    - name: Create user directories
+      file:
+        path: "/home/{{ item.0.name }}/{{ item.1 }}"
+        state: directory
+        owner: "{{ item.0.name }}"
+        group: "{{ item.0.name }}"
+        mode: '0755'
+      loop: "{{ users_to_create | product(['bin', 'workspaces', '.ssh']) | list }}"
+      when: item.0.create_home | default(true)
+      tags: ['users', 'directories']
+    
+    - name: Set proper permissions on .ssh directory
+      file:
+        path: "/home/{{ item.name }}/.ssh"
+        state: directory
+        owner: "{{ item.name }}"
+        group: "{{ item.name }}"
+        mode: '0700'
+      loop: "{{ users_to_create }}"
+      when: item.create_home | default(true)
+      tags: ['users', 'ssh']
+    
+    - name: Display created users
+      debug:
+        msg: "Created user: {{ item.name }} with groups: {{ item.groups | default([]) | join(', ') }}"
+      loop: "{{ users_to_create }}"
+      tags: ['users', 'info']

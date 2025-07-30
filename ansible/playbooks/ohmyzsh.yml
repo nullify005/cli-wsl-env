@@ -1,0 +1,185 @@
+---
+- name: Install Oh My Zsh for specific users
+  hosts: all
+  become: yes
+  gather_facts: yes
+  
+  vars:
+    # Define users to install Oh My Zsh for
+    ohmyzsh_users:
+      - username: "{{ username }}"
+        themes: ["robbyrussell", "agnoster", "powerlevel10k/powerlevel10k"]
+        plugins: 
+          - git
+          - sudo
+          - docker
+          - asdf
+          - zsh-autosuggestions
+          - zsh-syntax-highlighting
+        default_theme: "robbyrussell"
+        install_fonts: true
+    
+    # Oh My Zsh configuration
+    ohmyzsh_repo: "https://github.com/ohmyzsh/ohmyzsh.git"
+    
+    # Popular plugins that need separate installation
+    external_plugins:
+      - name: zsh-autosuggestions
+        repo: "https://github.com/zsh-users/zsh-autosuggestions"
+        dest: "custom/plugins/zsh-autosuggestions"
+      - name: zsh-syntax-highlighting
+        repo: "https://github.com/zsh-users/zsh-syntax-highlighting.git"
+        dest: "custom/plugins/zsh-syntax-highlighting"
+      - name: powerlevel10k
+        repo: "https://github.com/romkatv/powerlevel10k.git"
+        dest: "custom/themes/powerlevel10k"
+  
+  tasks:
+    # ========================================
+    # INSTALL PREREQUISITES
+    # ========================================
+    
+    - name: Install zsh and prerequisites
+      apt:
+        name:
+          - zsh
+          - git
+          - curl
+          - wget
+          - fontconfig
+          - fonts-powerline
+        state: present
+        update_cache: yes
+      tags: ['ohmyzsh', 'prerequisites']
+    
+    # - name: Install fonts for powerline themes
+    #   block:
+    #     - name: Create fonts directory
+    #       file:
+    #         path: /usr/share/fonts/truetype/powerline
+    #         state: directory
+    #         mode: '0755'
+        
+    #     - name: Download powerline fonts
+    #       get_url:
+    #         url: "https://github.com/powerline/powerline/raw/develop/font/{{ item }}"
+    #         dest: "/usr/share/fonts/truetype/powerline/{{ item }}"
+    #         mode: '0644'
+    #       loop:
+    #         - "PowerlineSymbols.otf"
+    #         - "10-powerline-symbols.conf"
+    #       ignore_errors: no
+        
+    #     - name: Update font cache
+    #       command: fc-cache -f -v
+    #       changed_when: false
+      
+    #   when: ohmyzsh_users | selectattr('install_fonts', 'equalto', true) | list | length > 0
+    #   tags: ['ohmyzsh', 'fonts']
+    
+    # ========================================
+    # INSTALL OH MY ZSH FOR EACH USER
+    # ========================================
+    
+    - name: Check if user exists
+      getent:
+        database: passwd
+        key: "{{ item.username }}"
+      register: user_exists
+      loop: "{{ ohmyzsh_users }}"
+      failed_when: false
+      tags: ['ohmyzsh', 'users']
+    
+    - name: Get user home directory
+      getent:
+        database: passwd
+        key: "{{ item.username }}"
+      register: user_info
+      loop: "{{ ohmyzsh_users }}"
+      when: user_exists is succeeded
+      tags: ['ohmyzsh', 'users']
+    
+    - name: Check if Oh My Zsh is already installed
+      stat:
+        path: "{{ ansible_facts.getent_passwd[item.username][4] }}/.oh-my-zsh"
+      register: ohmyzsh_installed
+      loop: "{{ ohmyzsh_users }}"
+      loop_control:
+        label: "{{ item.username }}"
+        index_var: user_index
+      tags: ['ohmyzsh', 'check']
+        
+    - name: Install Oh My Zsh for users
+      git:
+        repo: "{{ ohmyzsh_repo }}"
+        dest: "{{ ansible_facts.getent_passwd[item.0.username][4] }}/.oh-my-zsh"
+        depth: 1
+      become_user: "{{ item.0.username }}"
+      loop: "{{ ohmyzsh_users | zip(ohmyzsh_installed.results) | list }}"
+      loop_control:
+        label: "{{ item.0.username }}"
+      when: not item.1.stat.exists
+      tags: ['ohmyzsh', 'install']
+    
+    # ========================================
+    # INSTALL EXTERNAL PLUGINS AND THEMES
+    # ========================================
+    
+    - name: Install external plugins
+      git:
+        repo: "{{ plugin.repo }}"
+        dest: "{{ ansible_facts.getent_passwd[user.username][4] }}/.oh-my-zsh/{{ plugin.dest }}"
+        depth: 1
+      become_user: "{{ user.username }}"
+      loop: "{{ ohmyzsh_users | product(external_plugins) | list }}"
+      loop_control:
+        loop_var: item
+        label: "{{ item.0.username }} - {{ item.1.name }}"
+      vars:
+        user: "{{ item.0 }}"
+        plugin: "{{ item.1 }}"
+      when: plugin.name in user.plugins or plugin.name in user.themes
+      tags: ['ohmyzsh', 'plugins']
+    
+    # ========================================
+    # VERIFICATION
+    # ========================================
+    
+    - name: Verify Oh My Zsh installation
+      stat:
+        path: "{{ ansible_facts.getent_passwd[item.username][4] }}/.oh-my-zsh/oh-my-zsh.sh"
+      register: ohmyzsh_verify
+      loop: "{{ ohmyzsh_users }}"
+      loop_control:
+        label: "{{ item.username }}"
+      tags: ['ohmyzsh', 'verify']
+    
+    - name: Check zsh version
+      command: zsh --version
+      register: zsh_version
+      changed_when: false
+      tags: ['ohmyzsh', 'verify']
+    
+    - name: Display installation summary
+      debug:
+        msg: |
+          Oh My Zsh installation completed!
+          
+          Zsh version: {{ zsh_version.stdout }}
+          
+          Installed for users:
+          {% for user in ohmyzsh_users %}
+          - {{ user.username }}: 
+            Theme: {{ user.default_theme }}
+            Plugins: {{ user.plugins | join(', ') }}
+            Status: {{ 'SUCCESS' if ohmyzsh_verify.results[loop.index0].stat.exists else 'FAILED' }}
+          {% endfor %}
+          
+          To activate:
+          1. Log out and log back in, or
+          2. Run: exec zsh
+          
+          Configuration files:
+          - ~/.zshrc (main config)
+          - ~/.p10k.zsh (powerlevel10k config, if applicable)
+      tags: ['ohmyzsh', 'summary']

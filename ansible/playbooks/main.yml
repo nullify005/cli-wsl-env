@@ -1,0 +1,9 @@
+---
+- name: Configure an Ubuntu Host on WSL for development
+  hosts: all
+
+- import_playbook: packages.yml
+- import_playbook: users.yml
+- import_playbook: asdf.yml
+- import_playbook: ohmyzsh.yml
+- import_playbook: bitwarden.yml

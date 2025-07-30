@@ -1,0 +1,27 @@
+- name: Install Bitwarden CLI
+  hosts: all
+  become: yes
+  become_user: root
+  gather_facts: yes
+
+  vars:
+    url: https://github.com/bitwarden/clients/releases/download/cli-v2025.7.0/bw-linux-2025.7.0.zip
+    checksum: sha256:b0bdaaa1f77d8dbf304e37403fa57a54aa1dafbe7c660d120ad67f286c174adf
+
+  tasks:
+    - name: Install Bitwarden CLI
+      block:
+        - name: Fetch Bitwarden install
+          get_url:
+            url: "{{ url }}"
+            dest: "/tmp/{{ url | basename }}"
+            checksum: "{{ checksum }}"
+        - name: Unpack ASDF install
+          ansible.builtin.unarchive:
+            src: "/tmp/{{ url | basename }}"
+            dest: /usr/local/bin
+          become: true
+        - name: Remove ASDF install
+          file:
+            path: "/tmp/{{ url | basename }}"
+            state: absent
