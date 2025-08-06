@@ -19,7 +19,7 @@
         
     # Common settings
     default_shell: /bin/bash
-    password_expire_days: 0
+    password_expire_days: -1
   
   tasks:
     - name: Create user groups if they don't exist
