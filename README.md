@@ -14,6 +14,24 @@ has decent integration with the host system.
 .\WSL-Ubuntu-Setup.ps1 -Action install -Name <name>
 ```
 
+## Syncing the dotfiles
+
+```shell
+chezmoi init https://github.com/nullify005/dotfiles.git
+bw login nullify005@gmail.com
+```
+
+Set the session as stated
+
+```shell
+chezmoi diff
+chezmoi apply
+. ~/.zshrc
+```
+
+Then reset the chezmoi remote git to be `git@github.com:nullify005/dotfiles.git` so that it
+starts using the ssh keys.
+
 ## Cleaning up
 
 ```shell
