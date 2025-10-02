@@ -7,3 +7,4 @@
 - import_playbook: asdf.yml
 - import_playbook: ohmyzsh.yml
 - import_playbook: bitwarden.yml
+- import_playbook: saml2aws.yml

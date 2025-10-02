@@ -1,0 +1,62 @@
+---
+- name: Install saml2aws
+  hosts: localhost
+  become: yes
+  vars:
+    saml2aws_version: "latest"
+    install_path: "/usr/local/bin"
+
+  tasks:
+    - name: Get latest saml2aws release information
+      uri:
+        url: https://api.github.com/repos/Versent/saml2aws/releases/latest
+        return_content: yes
+      register: saml2aws_release
+      when: saml2aws_version == "latest"
+
+    - name: Set saml2aws version from latest release
+      set_fact:
+        saml2aws_version: "{{ saml2aws_release.json.tag_name | regex_replace('^v', '') }}"
+      when: saml2aws_version == "latest"
+
+    - name: Determine architecture
+      set_fact:
+        arch: "{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' if ansible_architecture == 'aarch64' else ansible_architecture }}"
+
+    - name: Download saml2aws
+      get_url:
+        url: "https://github.com/Versent/saml2aws/releases/download/v{{ saml2aws_version }}/saml2aws_{{ saml2aws_version }}_linux_{{ arch }}.tar.gz"
+        dest: "/tmp/saml2aws.tar.gz"
+        mode: '0644'
+
+    - name: Extract saml2aws
+      unarchive:
+        src: "/tmp/saml2aws.tar.gz"
+        dest: "/tmp"
+        remote_src: yes
+
+    - name: Install saml2aws binary
+      copy:
+        src: "/tmp/saml2aws"
+        dest: "{{ install_path }}/saml2aws"
+        mode: '0755'
+        remote_src: yes
+
+    - name: Clean up temporary files
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "/tmp/saml2aws.tar.gz"
+        - "/tmp/saml2aws"
+        - "/tmp/LICENSE.md"
+        - "/tmp/README.md"
+
+    - name: Verify saml2aws installation
+      command: saml2aws --version
+      register: saml2aws_version_check
+      changed_when: false
+
+    - name: Display installed version
+      debug:
+        msg: "saml2aws {{ saml2aws_version_check.stdout }} installed successfully"

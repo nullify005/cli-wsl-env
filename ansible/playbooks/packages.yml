@@ -4,7 +4,7 @@
   hosts: all
   become: yes
   gather_facts: yes
-  
+
   vars:
     # Define your packages here
     essential_packages:
@@ -24,10 +24,11 @@
       - jq
       - chromium-browser
       - snapd
-    
+
     development_packages:
       - build-essential
       - docker.io
+      - docker-buildx
 
     snaps_sandbox:
       - vale
@@ -36,40 +37,40 @@
       - chezmoi
 
     optional_packages: []
-    
+
     # Set which package groups to install
     install_essential: true
     install_development: true
     install_optional: false
-  
+
   tasks:
     - name: Update apt cache
       apt:
         update_cache: yes
         cache_valid_time: 3600
       tags: ['always']
-    
+
     - name: Upgrade all packages
       apt:
         upgrade: dist
         autoremove: yes
         autoclean: yes
       tags: ['upgrade']
-    
+
     - name: Install essential packages
       apt:
         name: "{{ essential_packages }}"
         state: present
       when: install_essential | bool
       tags: ['essential']
-    
+
     - name: Install development packages
       apt:
         name: "{{ development_packages }}"
         state: present
       when: install_development | bool
       tags: ['development']
-    
+
     - name: Install optional packages
       apt:
         name: "{{ optional_packages }}"
@@ -94,7 +95,7 @@
         state: present
         channel: stable
       loop: "{{ snaps_sandbox | list }}"
-    
+
     - name: classic snaps
       community.general.snap:
         name: "{{ item }}"
