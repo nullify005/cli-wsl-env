@@ -37,3 +37,9 @@ starts using the ssh keys.
 ```shell
 wsl --unregister <name>
 ```
+
+## Updating WSL
+
+```shell
+wsl --update
+```
