@@ -16,10 +16,10 @@ param(
     [string]$PackageLocation = "C:\WSL\.packages",
 
     [Parameter(Mandatory=$false)]
-    [string]$DistroRootfs = "https://mirror.aarnet.edu.au/pub/ubuntu/releases/24.04/ubuntu-24.04.2-wsl-amd64.wsl",
+    [string]$DistroRootfs = "https://mirror.aarnet.edu.au/pub/ubuntu/releases/24.04/ubuntu-24.04.3-wsl-amd64.wsl",
 
     [Parameter(Mandatory=$false)]
-    [string]$DistroRootfsHash = "5D1EEA52103166F1C460DC012ED325C6EB31D2CE16EF6A00FFDFDA8E99E12F43"
+    [string]$DistroRootfsHash = "c74833a55e525b1e99e1541509c566bb3e32bdb53bf27ea3347174364a57f47c"
 )
 
 # Function to check if WSL distribution exists
@@ -161,7 +161,7 @@ function Set-WSLConfiguration {
     wsl --manage $Name --set-default-user $User
     wsl --terminate $Name
     wsl --shutdown
-    wsl --manage $Name --set-sparse true
+    wsl --manage $Name --set-sparse true --allow-unsafe
     
     Write-Host "WSL configuration completed" -ForegroundColor Green
 }
