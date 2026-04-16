@@ -24,6 +24,10 @@
       - jq
       - chromium-browser
       - snapd
+      - socat
+      - bubblewrap
+      - dnsutils
+      - ffpmeg
 
     development_packages:
       - build-essential
